@@ -29,11 +29,12 @@ app.add_middleware(
 
 # Request models
 class FLANT5Request(BaseModel):
-    input_text: str = Field(..., description="Input sentence for T5 lexical simplification")
+    sentence: str = Field(..., description="Input sentence containing the complex word")
+    word: str = Field(..., description="Complex word to be simplified")
     model_version: str = Field("v1", description="Model version: 'v1' (t5-base untrained) or 'v2' (flan-t5-lexical trained)")
-    max_length: int = Field(128, ge=10, le=512, description="Maximum output length")
-    temperature: float = Field(1.0, ge=0.1, le=2.0, description="Sampling temperature")
-    num_beams: int = Field(4, ge=1, le=10, description="Number of beams for beam search")
+    k: int = Field(5, ge=1, le=10, description="Number of candidates to return (TOP_K)")
+    num_beams: int = Field(10, ge=1, le=20, description="Number of beams for beam search")
+    max_length: int = Field(128, ge=10, le=512, description="Maximum input length")
 
 class CodeGenRequest(BaseModel):
     prompt: str = Field(..., description="Code prompt for CodeGen model")
@@ -43,8 +44,12 @@ class CodeGenRequest(BaseModel):
     top_p: float = Field(0.95, ge=0.0, le=1.0, description="Nucleus sampling probability")
 
 class CompareRequest(BaseModel):
-    input_text: str = Field(..., description="Input text/prompt to compare")
+    input_text: str = Field(None, description="Input text/prompt (for codegen)")
+    sentence: str = Field(None, description="Sentence with complex word (for T5)")
+    word: str = Field(None, description="Complex word to simplify (for T5)")
     model_type: str = Field(..., description="Model type: 'flan-t5' or 'codegen'")
+    k: int = Field(5, ge=1, le=10, description="Number of candidates (T5 only)")
+    num_beams: int = Field(10, ge=1, le=20, description="Beam search (T5 only)")
     max_length: int = Field(128, ge=10, le=512)
     temperature: float = Field(1.0, ge=0.1, le=2.0)
 
@@ -138,24 +143,30 @@ async def predict_flan_t5(request: FLANT5Request):
         
         start_time = time.time()
         
-        output = model_manager.generate_flan_t5(
+        candidates = model_manager.generate_flan_t5(
             model_key=model_key,
-            input_text=request.input_text,
-            max_length=request.max_length,
-            temperature=request.temperature,
-            num_beams=request.num_beams
+            sentence=request.sentence,
+            word=request.word,
+            k=request.k,
+            num_beams=request.num_beams,
+            max_length=request.max_length
         )
         
         inference_time = time.time() - start_time
+        
+        # Return candidates as comma-separated string
+        output = ", ".join(candidates) if candidates else "(no candidates)"
         
         return InferenceResponse(
             output=output,
             model_version=request.model_version,
             inference_time=round(inference_time, 3),
             parameters={
-                "max_length": request.max_length,
-                "temperature": request.temperature,
-                "num_beams": request.num_beams
+                "sentence": request.sentence,
+                "word": request.word,
+                "k": request.k,
+                "num_beams": request.num_beams,
+                "candidates": candidates
             }
         )
     
@@ -216,13 +227,20 @@ async def compare_models(request: CompareRequest):
         # Generate with v1
         start_v1 = time.time()
         if request.model_type == "flan-t5":
-            v1_output = model_manager.generate_flan_t5(
+            if not request.sentence or not request.word:
+                raise HTTPException(status_code=400, detail="sentence and word required for T5")
+            v1_candidates = model_manager.generate_flan_t5(
                 model_key=v1_key,
-                input_text=request.input_text,
-                max_length=request.max_length,
-                temperature=request.temperature
+                sentence=request.sentence,
+                word=request.word,
+                k=request.k,
+                num_beams=request.num_beams,
+                max_length=request.max_length
             )
+            v1_output = ", ".join(v1_candidates) if v1_candidates else "(no candidates)"
         else:
+            if not request.input_text:
+                raise HTTPException(status_code=400, detail="input_text required for codegen")
             v1_output = model_manager.generate_codegen(
                 model_key=v1_key,
                 prompt=request.input_text,
@@ -234,12 +252,15 @@ async def compare_models(request: CompareRequest):
         # Generate with v2
         start_v2 = time.time()
         if request.model_type == "flan-t5":
-            v2_output = model_manager.generate_flan_t5(
+            v2_candidates = model_manager.generate_flan_t5(
                 model_key=v2_key,
-                input_text=request.input_text,
-                max_length=request.max_length,
-                temperature=request.temperature
+                sentence=request.sentence,
+                word=request.word,
+                k=request.k,
+                num_beams=request.num_beams,
+                max_length=request.max_length
             )
+            v2_output = ", ".join(v2_candidates) if v2_candidates else "(no candidates)"
         else:
             v2_output = model_manager.generate_codegen(
                 model_key=v2_key,

@@ -129,37 +129,54 @@ class ModelManager:
         }
         return results
     
-    def generate_flan_t5(self, model_key: str, input_text: str, max_length: int = 128, 
-                         temperature: float = 1.0, num_beams: int = 4):
-        """Generate text using T5 model with proper lexical simplification prompt"""
+    def build_input(self, sentence: str, word: str) -> str:
+        """Build input format for lexical simplification (from after.ipynb)"""
+        import re
+        marked = re.sub(
+            rf"\b{re.escape(word)}\b", f"[{word}]",
+            sentence, count=1, flags=re.IGNORECASE
+        )
+        return f"simplify word: {word}\nsentence: {marked}"
+    
+    def generate_flan_t5(self, model_key: str, sentence: str, word: str, 
+                         k: int = 5, num_beams: int = 10, max_length: int = 128):
+        """Generate lexical simplification candidates using T5 model (from after.ipynb)"""
         if model_key not in self.models or model_key not in self.tokenizers:
             raise ValueError(f"Model {model_key} not loaded")
         
+        import re
         tokenizer = self.tokenizers[model_key]
         model = self.models[model_key]
         
-        # Use prompt format from before.ipynb for lexical simplification
-        prompt = f"""Replace the complex word with a simpler word.
-
-Sentence: {input_text}
-Complex word: 
-
-Simpler word:
-"""
+        # Build input using the format from after.ipynb
+        input_text = self.build_input(sentence, word)
         
-        inputs = tokenizer(prompt, return_tensors="pt", padding=True).to(self.device)
+        inputs = tokenizer(
+            input_text,
+            return_tensors="pt",
+            max_length=max_length,
+            truncation=True,
+        ).to(self.device)
         
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
-                max_length=max_length,
-                temperature=temperature,
                 num_beams=num_beams,
-                early_stopping=True
+                num_return_sequences=num_beams,
+                max_new_tokens=16,
+                early_stopping=True,
             )
         
-        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return result
+        # Decode and filter candidates (from after.ipynb)
+        decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        candidates, seen = [], set()
+        for raw in decoded:
+            w = re.sub(r"[^a-zA-Z]", "", raw.strip().lower().split()[0] if raw.strip() else "")
+            if w and w != word.lower() and w not in seen and len(w) > 1:
+                seen.add(w)
+                candidates.append(w)
+        
+        return candidates[:k]
     
     def generate_codegen(self, model_key: str, prompt: str, max_length: int = 128, 
                          temperature: float = 0.7, top_p: float = 0.95):

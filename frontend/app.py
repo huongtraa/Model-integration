@@ -75,13 +75,14 @@ def get_models_info():
         return None
 
 
-def predict_flan_t5(input_text: str, model_version: str, params: Dict):
+def predict_flan_t5(sentence: str, word: str, model_version: str, params: Dict):
     """Call FLAN-T5 prediction endpoint"""
     try:
         response = requests.post(
             f"{API_BASE_URL}/predict/flan-t5",
             json={
-                "input_text": input_text,
+                "sentence": sentence,
+                "word": word,
                 "model_version": model_version,
                 **params
             },
@@ -113,16 +114,23 @@ def predict_codegen(prompt: str, model_version: str, params: Dict):
         return {"error": str(e)}
 
 
-def compare_models(input_text: str, model_type: str, params: Dict):
+def compare_models(sentence: str, word: str, model_type: str, params: Dict):
     """Call comparison endpoint"""
     try:
+        payload = {
+            "model_type": model_type,
+            **params
+        }
+        
+        if model_type == "flan-t5":
+            payload["sentence"] = sentence
+            payload["word"] = word
+        else:
+            payload["input_text"] = sentence  # For codegen, sentence is the prompt
+        
         response = requests.post(
             f"{API_BASE_URL}/compare",
-            json={
-                "input_text": input_text,
-                "model_type": model_type,
-                **params
-            },
+            json=payload,
             timeout=120
         )
         if response.status_code == 200:
@@ -202,35 +210,46 @@ def show_single_model_mode():
     with col2:
         # Parameters
         st.subheader("Parameters")
-        max_length = st.slider("Max Length", 10, 512, 128, key="single_max_len")
-        temperature = st.slider("Temperature", 0.1, 2.0, 1.0, 0.1, key="single_temp")
-        
-        if model_type == "FLAN-T5":
-            num_beams = st.slider("Num Beams", 1, 10, 4, key="single_beams")
+        if model_type == "T5":
+            k = st.slider("Top K candidates", 1, 10, 5, key="single_k")
+            num_beams = st.slider("Num Beams", 1, 20, 10, key="single_beams")
+            max_length = st.slider("Max Length", 10, 512, 128, key="single_max_len")
         else:
+            max_length = st.slider("Max Length", 10, 512, 128, key="single_max_len")
+            temperature = st.slider("Temperature", 0.1, 2.0, 0.7, 0.1, key="single_temp")
             top_p = st.slider("Top P", 0.0, 1.0, 0.95, 0.05, key="single_top_p")
     
     # Input
     if model_type == "T5":
-        st.subheader("Input Sentence (Lexical Simplification)")
-        input_text = st.text_area(
-            "Enter sentence with complex words",
-            placeholder="Example: The weather today is extraordinarily magnificent.",
-            height=100,
-            key="single_input"
-        )
+        st.subheader("Input (Lexical Simplification)")
+        
+        col_a, col_b = st.columns([3, 1])
+        with col_a:
+            sentence_input = st.text_area(
+                "Sentence",
+                placeholder="The weather today is extraordinarily magnificent.",
+                height=80,
+                key="single_sentence"
+            )
+        with col_b:
+            word_input = st.text_input(
+                "Complex Word",
+                placeholder="extraordinarily",
+                key="single_word"
+            )
         
         # Example prompts
         st.markdown("**Example sentences:**")
         examples = [
-            "The weather today is extraordinarily magnificent.",
-            "The proliferation of artificial intelligence has revolutionized linguistics.",
-            "This medication can ameliorate the symptoms significantly."
+            ("The weather today is extraordinarily magnificent.", "extraordinarily"),
+            ("The proliferation of artificial intelligence has revolutionized linguistics.", "proliferation"),
+            ("This medication can ameliorate the symptoms significantly.", "ameliorate")
         ]
         example_buttons = st.columns(3)
-        for i, example in enumerate(examples):
+        for i, (sent, word) in enumerate(examples):
             if example_buttons[i].button(f"Example {i+1}", key=f"ex_single_{i}"):
-                st.session_state.single_input = example
+                st.session_state.single_sentence = sent
+                st.session_state.single_word = word
                 st.rerun()
     else:
         st.subheader("Code Prompt")
@@ -256,19 +275,24 @@ def show_single_model_mode():
     
     # Generate button
     if st.button("🚀 Generate", type="primary", key="single_generate"):
-        if not input_text:
-            st.warning("Please enter input text/prompt")
-            return
-        
-        with st.spinner(f"Generating with {model_type} {version}..."):
-            if model_type == "T5":
+        if model_type == "T5":
+            if not sentence_input or not word_input:
+                st.warning("Please enter both sentence and word")
+                return
+            
+            with st.spinner(f"Generating with {model_type} {version}..."):
                 params = {
-                    "max_length": max_length,
-                    "temperature": temperature,
-                    "num_beams": num_beams
+                    "k": k,
+                    "num_beams": num_beams,
+                    "max_length": max_length
                 }
-                result = predict_flan_t5(input_text, version, params)
-            else:
+                result = predict_flan_t5(sentence_input, word_input, version, params)
+        else:
+            if not input_text:
+                st.warning("Please enter input prompt")
+                return
+            
+            with st.spinner(f"Generating with {model_type} {version}..."):
                 params = {
                     "max_length": max_length,
                     "temperature": temperature,
@@ -310,30 +334,45 @@ def show_comparison_mode():
     
     with col2:
         st.subheader("Parameters")
-        max_length = st.slider("Max Length", 10, 512, 128, key="compare_max_len")
-        temperature = st.slider("Temperature", 0.1, 2.0, 1.0, 0.1, key="compare_temp")
+        if model_type == "flan-t5":
+            k = st.slider("Top K candidates", 1, 10, 5, key="compare_k")
+            num_beams = st.slider("Num Beams", 1, 20, 10, key="compare_beams")
+            max_length = st.slider("Max Length", 10, 512, 128, key="compare_max_len")
+        else:
+            max_length = st.slider("Max Length", 10, 512, 128, key="compare_max_len")
+            temperature = st.slider("Temperature", 0.1, 2.0, 0.7, 0.1, key="compare_temp")
     
     # Input
     if model_type == "flan-t5":
-        st.subheader("Input Sentence (Lexical Simplification)")
-        input_text = st.text_area(
-            "Enter sentence with complex words",
-            placeholder="Example: The weather today is extraordinarily magnificent.",
-            height=120,
-            key="compare_input"
-        )
+        st.subheader("Input (Lexical Simplification)")
+        
+        col_a, col_b = st.columns([3, 1])
+        with col_a:
+            sentence_input = st.text_area(
+                "Sentence",
+                placeholder="The weather today is extraordinarily magnificent.",
+                height=100,
+                key="compare_sentence"
+            )
+        with col_b:
+            word_input = st.text_input(
+                "Complex Word",
+                placeholder="extraordinarily",
+                key="compare_word"
+            )
         
         # Example prompts
         st.markdown("**Example sentences:**")
         examples = [
-            "The weather today is extraordinarily magnificent.",
-            "Machine learning algorithms are becoming increasingly sophisticated.",
-            "This medication can ameliorate the symptoms significantly."
+            ("The weather today is extraordinarily magnificent.", "extraordinarily"),
+            ("Machine learning algorithms are becoming increasingly sophisticated.", "sophisticated"),
+            ("This medication can ameliorate the symptoms significantly.", "ameliorate")
         ]
         cols = st.columns(3)
-        for i, example in enumerate(examples):
+        for i, (sent, word) in enumerate(examples):
             if cols[i].button(f"Example {i+1}", key=f"ex_comp_{i}"):
-                st.session_state.compare_input = example
+                st.session_state.compare_sentence = sent
+                st.session_state.compare_word = word
                 st.rerun()
     else:
         st.subheader("Code Prompt")
@@ -359,16 +398,29 @@ def show_comparison_mode():
     
     # Compare button
     if st.button("⚖️ Compare Models", type="primary", key="compare_btn"):
-        if not input_text:
-            st.warning("Please enter input text/prompt")
-            return
+        if model_type == "flan-t5":
+            if not sentence_input or not word_input:
+                st.warning("Please enter both sentence and word")
+                return
+        else:
+            if not input_text:
+                st.warning("Please enter code prompt")
+                return
         
         with st.spinner("Comparing v1 (untrained/base) vs v2 (trained)..."):
-            params = {
-                "max_length": max_length,
-                "temperature": temperature
-            }
-            result = compare_models(input_text, model_type, params)
+            if model_type == "flan-t5":
+                params = {
+                    "k": k,
+                    "num_beams": num_beams,
+                    "max_length": max_length
+                }
+                result = compare_models(sentence_input, word_input, model_type, params)
+            else:
+                params = {
+                    "max_length": max_length,
+                    "temperature": temperature
+                }
+                result = compare_models(input_text, "", model_type, params)
         
         # Display results
         if "error" in result:
