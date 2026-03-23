@@ -1,0 +1,13 @@
+[project]
+name = "model-integration-frontend"
+version = "1.0.0"
+description = "Streamlit frontend for model comparison"
+requires-python = ">=3.8"
+dependencies = [
+    "streamlit>=1.31.0",
+    "requests>=2.31.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

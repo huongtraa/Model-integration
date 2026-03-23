@@ -1,0 +1,9 @@
+# Placeholder for model storage
+# Models will be downloaded automatically or you can place them here
+
+# Directory structure:
+# models/
+#   flan-t5-v1/
+#   flan-t5-v2/
+#   codegen-v1/
+#   codegen-v2/

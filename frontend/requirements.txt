@@ -1,0 +1,7 @@
+# Streamlit Frontend Requirements
+
+# Web Framework
+streamlit>=1.31.0
+
+# HTTP Client
+requests>=2.31.0
