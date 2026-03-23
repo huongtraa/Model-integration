@@ -51,9 +51,9 @@ class ModelManager:
     def load_flan_t5_v2(self, model_path: str = None):
         """Load fine-tuned T5 (v2) from flan-t5-lexical - like before.ipynb"""
         try:
-            # Use provided path or default to ../../flan-t5-lexical
+            # Use provided path or default to ../models/flan-t5-lexical
             if model_path is None:
-                model_path = str(Path(__file__).parent.parent.parent / "flan-t5-lexical")
+                model_path = str(Path(__file__).parent.parent / "models" / "flan-t5-lexical")
             
             logger.info(f"Loading T5 v2 (fine-tuned): {model_path}")
             

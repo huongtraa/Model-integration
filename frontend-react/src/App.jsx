@@ -15,6 +15,7 @@ function App() {
         const health = await getHealth();
         setHealthStatus(health);
       } catch (err) {
+        console.error('Backend health check failed:', err);
         setHealthStatus({ status: 'error', message: 'Backend not available' });
       }
     };
@@ -25,11 +26,13 @@ function App() {
         setModelsInfo(models);
       } catch (err) {
         console.error('Failed to fetch models info:', err);
+        // Don't crash, just skip models info
       }
     };
 
-    checkHealth();
-    fetchModels();
+    // Run checks but don't block rendering
+    checkHealth().catch(console.error);
+    fetchModels().catch(console.error);
   }, []);
 
   return (
@@ -89,7 +92,7 @@ function App() {
               <ul style={styles.modelsList}>
                 {Object.entries(modelsInfo).map(([key, value]) => (
                   <li key={key}>
-                    <strong>{key}:</strong> {value}
+                    <strong>{key}:</strong> {typeof value === 'string' ? value : JSON.stringify(value)}
                   </li>
                 ))}
               </ul>

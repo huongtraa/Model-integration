@@ -334,7 +334,7 @@ const styles = {
     padding: '6px 12px',
     fontSize: '13px',
     background: '#e3f2fd',
-    border: '1px solid '#90caf9',
+    border: '1px solid #90caf9',
     borderRadius: '4px',
     cursor: 'pointer',
     transition: 'background 0.2s',
