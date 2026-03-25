@@ -22,7 +22,7 @@ export const predictFlanT5 = async (sentence, word, modelVersion, params) => {
 
 export const predictCodeGen = async (prompt, modelVersion, params) => {
   const response = await api.post('/predict/codegen', {
-    input_text: prompt,
+    prompt: prompt,
     model_version: modelVersion,
     max_length: params.max_length || 100,
     temperature: params.temperature || 0.7,

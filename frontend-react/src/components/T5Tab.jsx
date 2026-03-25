@@ -37,7 +37,13 @@ const T5Tab = () => {
         setResult({ type: 'compare', data });
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to get prediction');
+      const errorDetail = err.response?.data?.detail;
+      if (Array.isArray(errorDetail)) {
+        // FastAPI validation errors
+        setError(errorDetail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('; '));
+      } else {
+        setError(errorDetail || err.message || 'Failed to get prediction');
+      }
     } finally {
       setLoading(false);
     }
@@ -195,15 +201,15 @@ const T5Tab = () => {
               </div>
               <div style={styles.resultContent}>
                 <div style={styles.resultRow}>
-                  <strong>Sentence:</strong> {result.data.sentence}
+                  <strong>Sentence:</strong> {result.data.parameters.sentence}
                 </div>
                 <div style={styles.resultRow}>
-                  <strong>Complex Word:</strong> <span style={styles.highlightWord}>{result.data.word}</span>
+                  <strong>Complex Word:</strong> <span style={styles.highlightWord}>{result.data.parameters.word}</span>
                 </div>
                 <div style={styles.resultRow}>
                   <strong>Candidates:</strong>
                   <div style={styles.candidatesList}>
-                    {result.data.candidates.split(', ').map((candidate, idx) => (
+                    {result.data.parameters.candidates.map((candidate, idx) => (
                       <span key={idx} style={styles.candidateTag}>
                         {idx + 1}. {candidate}
                       </span>
@@ -222,7 +228,7 @@ const T5Tab = () => {
                   <div style={styles.resultRow}>
                     <strong>Candidates:</strong>
                     <div style={styles.candidatesList}>
-                      {result.data.v1.candidates.split(', ').map((candidate, idx) => (
+                      {result.data.v1.parameters.candidates.map((candidate, idx) => (
                         <span key={idx} style={styles.candidateTag}>
                           {idx + 1}. {candidate}
                         </span>
@@ -240,7 +246,7 @@ const T5Tab = () => {
                   <div style={styles.resultRow}>
                     <strong>Candidates:</strong>
                     <div style={styles.candidatesList}>
-                      {result.data.v2.candidates.split(', ').map((candidate, idx) => (
+                      {result.data.v2.parameters.candidates.map((candidate, idx) => (
                         <span key={idx} style={styles.candidateTag}>
                           {idx + 1}. {candidate}
                         </span>

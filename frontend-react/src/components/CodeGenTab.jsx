@@ -44,7 +44,13 @@ const CodeGenTab = () => {
         setResult({ type: 'compare', data });
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to get prediction');
+      const errorDetail = err.response?.data?.detail;
+      if (Array.isArray(errorDetail)) {
+        // FastAPI validation errors
+        setError(errorDetail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('; '));
+      } else {
+        setError(errorDetail || err.message || 'Failed to get prediction');
+      }
     } finally {
       setLoading(false);
     }
