@@ -214,11 +214,14 @@ const CodeGenTab = () => {
               <div style={styles.resultContent}>
                 <div style={styles.resultRow}>
                   <strong>Prompt:</strong>
-                  <pre style={styles.codeBlock}>{result.data.input_text}</pre>
+                  <pre style={styles.codeBlock}>{prompt}</pre>
                 </div>
                 <div style={styles.resultRow}>
                   <strong>Generated Code:</strong>
-                  <pre style={styles.codeBlock}>{result.data.generated_text}</pre>
+                  <pre style={styles.codeBlock}>{result.data.output}</pre>
+                </div>
+                <div style={styles.resultRow}>
+                  <strong>Inference Time:</strong> {result.data.inference_time}s
                 </div>
               </div>
             </div>
@@ -231,7 +234,10 @@ const CodeGenTab = () => {
                 <div style={styles.resultContent}>
                   <div style={styles.resultRow}>
                     <strong>Generated Code:</strong>
-                    <pre style={styles.codeBlock}>{result.data.v1.generated_text}</pre>
+                    <pre style={styles.codeBlock}>{result.data.v1_output}</pre>
+                  </div>
+                  <div style={styles.resultRow}>
+                    <strong>Time:</strong> {result.data.v1_time}s
                   </div>
                 </div>
               </div>
@@ -243,7 +249,10 @@ const CodeGenTab = () => {
                 <div style={styles.resultContent}>
                   <div style={styles.resultRow}>
                     <strong>Generated Code:</strong>
-                    <pre style={styles.codeBlock}>{result.data.v2.generated_text}</pre>
+                    <pre style={styles.codeBlock}>{result.data.v2_output}</pre>
+                  </div>
+                  <div style={styles.resultRow}>
+                    <strong>Time:</strong> {result.data.v2_time}s
                   </div>
                 </div>
               </div>
